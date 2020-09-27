@@ -24,7 +24,6 @@ where
 import Development.Shake (Verbosity (..))
 import Options.Applicative
 import Relude
-import Relude.Extra.Tuple
 import System.FilePath
 import qualified Text.Megaparsec as M
 import qualified Text.Megaparsec.Char as M
@@ -73,14 +72,21 @@ cliParser inputDirDefault outputDirDefault = do
               <> help "Log nothing"
           )
       )
-  ~(inputDir, shakeDbDir) <-
-    fmap (mapToSnd shakeDbDirFrom) $
+  inputDir <-
+    option
+      directoryReader
+      ( long "input-dir"
+          <> metavar "INPUTDIR"
+          <> value inputDirDefault
+          <> help ("Directory containing the source files (default: " <> inputDirDefault <> ")")
+      )
+  mShakeDir <-
+    optional $
       option
         directoryReader
-        ( long "input-dir"
-            <> metavar "INPUTDIR"
-            <> value inputDirDefault
-            <> help ("Directory containing the source files (" <> "default: " <> inputDirDefault <> ")")
+        ( long "shake-dir"
+            <> metavar "SHAKEDIR"
+            <> help "Directory to hold the .shake database directory (default: INPUTDIR)"
         )
   outputDir <-
     option
@@ -91,7 +97,7 @@ cliParser inputDirDefault outputDirDefault = do
           <> help ("Directory where files will be generated (" <> "default: " <> outputDirDefault <> ")")
       )
   ~(watchIgnore) <- pure builtinWatchIgnores
-  pure CliConfig {..}
+  pure CliConfig { shakeDbDir = shakeDbDirFrom (fromMaybe inputDir mShakeDir), .. }
 
 watchOption :: Parser Bool
 watchOption =
