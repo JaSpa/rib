@@ -70,11 +70,13 @@ library
       Rib.Extra.CSS
       Rib.Extra.OpenGraph
 
-test-suite rib-test 
+test-suite rib-test
   import: library-common
   type: exitcode-stdio-1.0
-  hs-source-dirs: test 
+  hs-source-dirs: test
   main-is: Spec.hs
+  other-modules:
+    Rib.CliSpec
   build-depends:
     base-noprelude >=4.12 && <4.14,
     relude,
