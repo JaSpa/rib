@@ -7,6 +7,7 @@
 -- | Filesystem watching using fsnotify
 module Rib.Watch
   ( onTreeChange,
+    onAllTreeChanges,
   )
 where
 
@@ -22,10 +23,13 @@ import System.FSNotify (Event (..), watchTreeChan, withManager)
 -- If multiple events fire rapidly, the IO action is invoked only once, taking
 -- those multiple events as its argument.
 onTreeChange :: FilePath -> ([Event] -> IO ()) -> IO ()
-onTreeChange fp f = do
+onTreeChange fp = onAllTreeChanges [fp]
+
+onAllTreeChanges :: Foldable t => t FilePath -> ([Event] -> IO ()) -> IO ()
+onAllTreeChanges fps f = do
   withManager $ \mgr -> do
     eventCh <- newChan
-    void $ watchTreeChan mgr fp (const True) eventCh
+    for_ fps $ \fp -> watchTreeChan mgr fp (const True) eventCh
     forever $ do
       firstEvent <- readChan eventCh
       events <- debounce 100 [firstEvent] $ readChan eventCh
