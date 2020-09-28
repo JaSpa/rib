@@ -25,11 +25,12 @@ import Rib.Cli (CliConfig (CliConfig), cliParser)
 import qualified Rib.Cli as Cli
 import Rib.Log
 import qualified Rib.Server as Server
-import Rib.Watch (onTreeChange)
+import Rib.Watch (onAllTreeChanges)
 import System.Directory
 import System.FSNotify (Event (..), eventPath)
 import System.FilePath
 import System.IO (BufferMode (LineBuffering), hSetBuffering)
+import Text.Show (showChar, showString, showListWith)
 
 -- | Run Rib using arguments passed in the command line.
 run ::
@@ -76,10 +77,23 @@ shakeOptionsFrom cfg'@CliConfig {..} =
       shakeExtra = addShakeExtra cfg' (shakeExtra shakeOptions)
     }
 
+showFileList :: NonEmpty FilePath -> String
+showFileList = \case
+  fp :| [] -> showFile fp ""
+  fps      -> showListWith showFile (toList fps) ""
+  where
+    showFile fp = showChar '`' . showString fp . showChar '`'
+
 runShakeBuild :: CliConfig -> Action () -> IO ()
 runShakeBuild cfg@CliConfig {..} buildAction = do
   runShake cfg $ do
-    logStrLn cfg $ "[Rib] Generating " <> inputDir <> " (rebuildAll=" <> show rebuildAll <> ")"
+    logStrLn cfg $ mconcat
+      [ "[Rib] Generating "
+      , showFileList inputDirs
+      , " (rebuildAll="
+      , show rebuildAll
+      , ")"
+      ]
     buildAction
 
 runShake :: CliConfig -> Action () -> IO ()
@@ -103,17 +117,23 @@ runShakeAndObserve cfg@CliConfig {..} buildAction = do
   -- flag to disable this.
   runShakeBuild (cfg {Cli.rebuildAll = True}) buildAction
   -- And then every time a file changes under the current directory
-  logStrLn cfg $ "[Rib] Watching " <> inputDir <> " for changes"
+  logStrLn cfg $ "[Rib] Watching " <> showFileList inputDirs <> " for changes"
   onSrcChange $ runShakeBuild cfg buildAction
   where
     onSrcChange :: IO () -> IO ()
     onSrcChange f = do
       -- Canonicalizing path is important as we are comparing path ancestor using isPrefixOf
-      dir <- canonicalizePath inputDir
+      dirs <- mapM canonicalizePath inputDirs
+
       -- Top-level directories to ignore from notifications
       let isBlacklisted :: FilePath -> Bool
-          isBlacklisted p = or $ flip fmap watchIgnore $ \b -> (dir </> b) `isPrefixOf` p
-      onTreeChange dir $ \allEvents -> do
+          isBlacklisted p = or
+            [ (dir </> b) `isPrefixOf` p
+              | dir <- toList dirs
+              , b <- watchIgnore
+            ]
+
+      onAllTreeChanges dirs $ \allEvents -> do
         let events = filter (not . isBlacklisted . eventPath) allEvents
         unless (null events) $ do
           -- Log the changed events for diagnosis.

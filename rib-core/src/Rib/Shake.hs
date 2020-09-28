@@ -41,7 +41,11 @@ getCliConfig = getShakeExtra >>= \case
 --
 -- This is same as the first argument to `Rib.App.run`
 ribInputDir :: Action FilePath
-ribInputDir = Cli.inputDir <$> getCliConfig
+ribInputDir = head <$> ribInputDirs
+{-# DEPRECATED ribInputDir "Use ribInputDirs instead" #-}
+
+ribInputDirs :: Action (NonEmpty FilePath)
+ribInputDirs = Cli.inputDirs <$> getCliConfig
 
 -- | Output directory where files are generated
 --

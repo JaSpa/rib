@@ -21,6 +21,7 @@ module Rib.Cli
   )
 where
 
+import qualified Data.List.NonEmpty as NE
 import Development.Shake (Verbosity (..))
 import Options.Applicative
 import Relude
@@ -44,7 +45,7 @@ data CliConfig
         -- Setting this to `Silent` will affect Rib's own logging as well.
         verbosity :: Verbosity,
         -- | Directory from which source content will be read.
-        inputDir :: FilePath,
+        inputDirs :: NonEmpty FilePath,
         -- | The path where static files will be generated.  Rib's server uses this
         -- directory when serving files.
         outputDir :: FilePath,
@@ -72,14 +73,15 @@ cliParser inputDirDefault outputDirDefault = do
               <> help "Log nothing"
           )
       )
-  inputDir <-
-    option
-      directoryReader
-      ( long "input-dir"
-          <> metavar "INPUTDIR"
-          <> value inputDirDefault
-          <> help ("Directory containing the source files (default: " <> inputDirDefault <> ")")
-      )
+  let inputDirOption =
+        option
+          directoryReader
+          ( long "input-dir"
+              <> metavar "INPUTDIR"
+              <> help ("Directory containing the source files (default: " <> inputDirDefault <> ")")
+          )
+  inputDirs <-
+    NE.some1 inputDirOption <|> pure (inputDirDefault :| [])
   mShakeDir <-
     optional $
       option
@@ -97,7 +99,10 @@ cliParser inputDirDefault outputDirDefault = do
           <> help ("Directory where files will be generated (" <> "default: " <> outputDirDefault <> ")")
       )
   ~(watchIgnore) <- pure builtinWatchIgnores
-  pure CliConfig { shakeDbDir = shakeDbDirFrom (fromMaybe inputDir mShakeDir), .. }
+  pure $
+    let shakeDirBase = fromMaybe (NE.head inputDirs) mShakeDir
+        shakeDbDir = shakeDbDirFrom shakeDirBase
+     in CliConfig { .. }
 
 watchOption :: Parser Bool
 watchOption =
