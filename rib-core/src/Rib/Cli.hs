@@ -81,7 +81,8 @@ cliParser inputDirDefault outputDirDefault = do
               <> help ("Directory containing the source files (default: " <> inputDirDefault <> ")")
           )
   inputDirs <-
-    NE.some1 inputDirOption <|> pure (inputDirDefault :| [])
+    NE.some1 inputDirOption
+      <|> pure (one (addTrailingPathSeparator inputDirDefault))
   mShakeDir <-
     optional $
       option
@@ -95,7 +96,7 @@ cliParser inputDirDefault outputDirDefault = do
       directoryReader
       ( long "output-dir"
           <> metavar "OUTPUTDIR"
-          <> value outputDirDefault
+          <> value (addTrailingPathSeparator outputDirDefault)
           <> help ("Directory where files will be generated (" <> "default: " <> outputDirDefault <> ")")
       )
   ~(watchIgnore) <- pure builtinWatchIgnores
